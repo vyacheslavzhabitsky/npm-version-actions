@@ -1,0 +1,46 @@
+name: Automate Version Patch
+
+on:
+  workflow_dispatch:
+
+jobs:
+  version-patch:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write 
+      pull-requests: write
+      
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          fetch-depth: 0
+  
+      - name: Create new branch
+        run: |
+         BRANCH_NAME=version-patch-${{ github.run_id }}
+         git checkout -b $BRANCH_NAME origin/main
+
+      - name: Run npm version patch
+        run: npm version patch --no-git-tag-version
+
+      - name: Get version from package.json
+        id: version
+        run: |
+          PACKAGE_JSON_VERSION=$(jq -r .version package.json)
+          echo "PACKAGE_JSON_VERSION=$PACKAGE_JSON_VERSION" >> $GITHUB_ENV  # Set it as an environment variable
+
+      - name: Push changes
+        run: |
+          BRANCH_NAME=version-patch-${{ github.run_id }}
+          git push -u origin $BRANCH_NAME
+
+      - name: Create Pull Request
+        uses: peter-evans/create-pull-request@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          branch: version-patch-${{ github.run_id }}
+          base: main
+          title: "Bump version to ${{ env.PACKAGE_JSON_VERSION }}"
+          body: "Automated version bump patch."
